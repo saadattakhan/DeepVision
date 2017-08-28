@@ -41,6 +41,13 @@ def detect_objects(image_np, sess, detection_graph):
         feed_dict={image_tensor: image_np_expanded})
 
     # Visualization of the results of a detection.
+    print boxes[0][0]
+    print image_np.shape
+    ymin, xmin, ymax, xmax = boxes[0][5]
+    im_width, im_height ,channel = image_np.shape
+    (left, right, top, bottom) = (int(xmin * im_width), int(xmax * im_width),int(ymin * im_height), int(ymax * im_height))
+    cropped = image_np[top:bottom, left:right]
+    cv2.imwrite("result.jpg",cropped)
     vis_util.visualize_boxes_and_labels_on_image_array(
         image_np,
         np.squeeze(boxes),
