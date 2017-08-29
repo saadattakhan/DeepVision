@@ -4,10 +4,19 @@ import numpy as np
 import tensorflow as tf
 
 from object_detection.utils import label_map_util
-from object_detection.utils import visualization_utils as vis_util
 import scipy.misc
-import time
 
+
+
+
+import multiprocessing
+from multiprocessing import Queue, Pool
+from object_detection.utils import label_map_util
+
+import collections
+from object_detection.utils import visualization_utils as vis_util
+
+import time
 
 
 
@@ -21,8 +30,7 @@ categories = label_map_util.convert_label_map_to_categories(label_map, max_num_c
                                                             use_display_name=True)
 category_index = label_map_util.create_category_index(categories)
 
-
-def detect_objects(image_np, sess, detection_graph):
+def detect_objects(image_np,sess,detection_graph):
     # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
     image_np_expanded = np.expand_dims(image_np, axis=0)
     image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
@@ -42,13 +50,7 @@ def detect_objects(image_np, sess, detection_graph):
         feed_dict={image_tensor: image_np_expanded})
 
     # Visualization of the results of a detection.
-    print boxes[0][0]
-    print image_np.shape
-    ymin, xmin, ymax, xmax = boxes[0][5]
-    im_width, im_height ,channel = image_np.shape
-    (left, right, top, bottom) = (int(xmin * im_width), int(xmax * im_width),int(ymin * im_height), int(ymax * im_height))
-    cropped = image_np[top:bottom, left:right]
-    cv2.imwrite("result.jpg",cropped)
+    
     vis_util.visualize_boxes_and_labels_on_image_array(
         image_np,
         np.squeeze(boxes),
@@ -60,11 +62,8 @@ def detect_objects(image_np, sess, detection_graph):
     return image_np
 
 
-
-
-if __name__ == '__main__':
-    cam="rtsp://admin:123@dmin123@10.16.0.101:554/cam/realmonitor?channel=5&subtype=0"
-    cap=cv2.VideoCapture(cam)
+def worker(input_q, output_q):
+    # Load a (frozen) Tensorflow model into memory.
 
     detection_graph = tf.Graph()
     with detection_graph.as_default():
@@ -75,9 +74,23 @@ if __name__ == '__main__':
             tf.import_graph_def(od_graph_def, name='')
 
         sess = tf.Session(graph=detection_graph)
+    while True:
+        frame = input_q.get()
+        output_q.put(detect_objects(frame,sess,detection_graph))
+    sess.close()
 
 
 
+if __name__ == '__main__':
+    cam="rtsp://admin:123@dmin123@10.16.0.101:554/cam/realmonitor?channel=5&subtype=0"
+    cap=cv2.VideoCapture(cam)
+    input_q = Queue(maxsize=5)
+    output_q = Queue(maxsize=5)
+    
+
+    
+
+    pool = Pool(2, worker, (input_q, output_q))
 
     start=time.time()
     max_frames = 50;
@@ -88,20 +101,23 @@ if __name__ == '__main__':
 
         if ret:
             numFrames=numFrames+1
-            cv2.imshow('Video', scipy.misc.imresize(detect_objects(frame, sess, detection_graph), (480,640)))
-            if numFrames == max_frames:
-                end = time.time()
-                seconds = end - start
-                newfps  = numFrames / seconds;
-                print "Estimated frames per second : {0}".format(newfps);
+            input_q.put(frame)
+            if output_q.empty():
+                pass  # fill up queue
+            else:
+                cv2.imshow('Video', scipy.misc.imresize(output_q.get(), (480,640)))
+                if numFrames == max_frames:
+                    end = time.time()
+                    seconds = end - start
+                    newfps  = numFrames / seconds;
+                    print "Estimated frames per second : {0}".format(newfps);
+
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break;
     
-    sess.close()
+    pool.terminate()
     cap.release()
     cv2.destroyAllWindows()
-    
-    
 
 
 
