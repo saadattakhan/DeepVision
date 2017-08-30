@@ -64,7 +64,7 @@ def detect_objects(image_np, sess, detection_graph):
 
 if __name__ == '__main__':
     cam="rtsp://admin:123@dmin123@10.16.0.101:554/cam/realmonitor?channel=5&subtype=0"
-    cap=cv2.VideoCapture(cam)
+    cap=cv2.VideoCapture(0)
 
     detection_graph = tf.Graph()
     with detection_graph.as_default():
