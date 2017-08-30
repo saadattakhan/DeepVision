@@ -18,6 +18,8 @@ import scipy.misc
 import multiprocessing
 from multiprocessing import Queue, Pool
 
+import time
+
 
 
 def to_rgb(img):
@@ -58,22 +60,35 @@ if __name__ == '__main__':
 	video_capture=cv2.VideoCapture(cam)
 	c=0
 	frame_interval=2 # frame intervals  
-	pool = Pool(2, worker, (input_q, output_q))
-	 # scale factor
+	pool = Pool(2, worker, (input_q, output_q))	 # scale factor
+
+	start=time.time()
+	max_frames = 50;
+	numFrames=0
 	
 	while True:
 		ret, frame = video_capture.read()
-		timeF = frame_interval
-		if(c%timeF == 0):
-			input_q.put(frame)
-			if output_q.empty():
-				pass
-			else:
-				cv2.imshow('Video', scipy.misc.imresize(output_q.get(), (480,640)))
-		c+=1
-		#cv2.imshow('Video', scipy.misc.imresize(frame, (480,640)))
-		if cv2.waitKey(1) & 0xFF == ord('q'):
-			break
+		if ret:
+			
+
+			timeF = frame_interval
+			if(c%timeF == 0):
+				numFrames=numFrames+1
+				input_q.put(frame)
+				if output_q.empty():
+					pass
+				else:
+					cv2.imshow('Video', scipy.misc.imresize(output_q.get(), (480,640)))
+					if numFrames == max_frames:
+						end = time.time()
+						seconds = end - start
+						newfps  = numFrames / seconds;
+						print "Estimated frames per second : {0}".format(newfps);
+					
+			c+=1
+			#cv2.imshow('Video', scipy.misc.imresize(frame, (480,640)))
+			if cv2.waitKey(1) & 0xFF == ord('q'):
+				break
     
 
 
