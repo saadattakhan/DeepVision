@@ -11,7 +11,7 @@ import pandas as pd
 
 def worker(input_q, output_q):
 	while True:
-		frame = input_q.get()
+		frame,dets = input_q.get()
 		output_q.put(frame)
 
 def load_dlib_models(predictor_path="shape_predictor_68_face_landmarks.dat",model_path="dlib_face_recognition_resnet_model_v1.dat"):
@@ -51,6 +51,7 @@ if __name__ == "__main__":
 
 	n_threads=multiprocessing.cpu_count()
 	faceTrackers = {}
+	faceScores = {}
 	rectangleColor = (0,165,255)
 	frame_count=0
 
@@ -79,7 +80,7 @@ if __name__ == "__main__":
 
 
 
-
+		dets=None
 		if frame_count % 12 ==0:
 			dets = detector(frame, 0)
 			for k, d in enumerate(dets):
@@ -134,7 +135,24 @@ if __name__ == "__main__":
 															y+h+20))
 
 						faceTrackers[ pred_label ] = tracker
-		input_q.put(frame)
+						faceScores[pred_label] = dist
+					else:
+						if dist<faceScores[matchedFid]:
+							print("Removing fid " + str(fid) + " from list of trackers")
+							faceTrackers.pop( matchedFid , None )
+							faceScores.pop( matchedFid , None)
+
+							tracker = dlib.correlation_tracker()
+							tracker.start_track(frame,
+												dlib.rectangle( x-10,
+																y-20,
+																x+w+10,
+																y+h+20))
+
+							faceTrackers[ pred_label ] = tracker
+							faceScores[pred_label] = dist
+
+		input_q.put((frame,dets))
 		if output_q.empty():
 			pass
 		else:
